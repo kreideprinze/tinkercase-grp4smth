@@ -1,0 +1,112 @@
+import kivy
+from kivy.lang import Builder
+from kivy.uix.screenmanager import ScreenManager, Screen
+from kivymd.app import MDApp
+from kivymd.uix.menu import MDDropdownMenu
+from kivymd.uix.button import MDRaisedButton
+from kivymd.uix.label import MDLabel
+import serial
+import serial.tools.list_ports
+
+KV = '''
+ScreenManager:
+    HomeScreen:
+    DeviceScreen:
+
+<HomeScreen>:
+    name: 'home'
+    BoxLayout:
+        orientation: 'vertical'
+        padding: 20
+        spacing: 20
+
+        canvas.before:
+            Rectangle:
+                source: 'background.jpg'  
+                size: self.size
+                pos: self.pos
+
+        MDRaisedButton:
+            text: 'Connect to Device'
+            pos_hint: {'center_x': 0.5}
+            on_release: app.root.current = 'device'
+
+        MDRaisedButton:
+            text: 'Turn ON'
+            pos_hint: {'center_x': 0.5}
+            on_release: app.turn_on()
+
+        MDRaisedButton:
+            text: 'Turn OFF'
+            pos_hint: {'center_x': 0.5}
+            on_release: app.turn_off()
+
+<DeviceScreen>:
+    name: 'device'
+    BoxLayout:
+        orientation: 'vertical'
+        padding: 20
+        spacing: 20
+
+        MDRaisedButton:
+            text: 'Back to Home'
+            pos_hint: {'center_x': 0.5}
+            on_release: app.root.current = 'home'
+
+        MDRaisedButton:
+            text: 'Connect to Device'
+            pos_hint: {'center_x': 0.5}
+            on_release: app.menu.open()
+
+        MDLabel:
+            id: status_label
+            text: 'Not Connected'
+            halign: 'center'
+'''
+
+
+class HomeScreen(Screen):
+    pass
+
+class DeviceScreen(Screen):
+    pass
+
+class MainApp(MDApp):
+    def build(self):
+        self.screen = Builder.load_string(KV)
+        self.arduino = None
+
+        menu_items = [
+            {
+                "viewclass": "OneLineListItem",
+                "text": port.device,
+                "on_release": lambda x=port.device: self.connect_device(x),
+            } for port in serial.tools.list_ports.comports()
+        ]
+
+        self.menu = MDDropdownMenu(
+            caller=self.screen.get_screen('device').children[0],
+            items=menu_items,
+            width_mult=4,
+        )
+
+        return self.screen
+
+    def connect_device(self, device):
+        try:
+            self.arduino = serial.Serial(device, 9600, timeout=1)
+            self.screen.get_screen('device').ids.status_label.text = f'Connected to {device}'
+        except Exception as e:
+            self.screen.get_screen('device').ids.status_label.text = f'Failed to connect: {str(e)}'
+        self.menu.dismiss()
+
+    def turn_on(self):
+        if self.arduino:
+            self.arduino.write(b'1')
+
+    def turn_off(self):
+        if self.arduino:
+            self.arduino.write(b'0')
+
+if __name__ == '__main__':
+    MainApp().run()
