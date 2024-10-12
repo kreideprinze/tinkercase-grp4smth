@@ -5,65 +5,57 @@ from kivymd.app import MDApp
 from kivymd.uix.menu import MDDropdownMenu
 from kivymd.uix.button import MDRaisedButton
 from kivymd.uix.label import MDLabel
-import bluetooth
+import serial
+import serial.tools.list_ports
+KV = '''
+ScreenManager:
+    HomeScreen:
+    DeviceScreen:
 
-import kivy
-from kivy.lang import Builder
-from kivy.uix.screenmanager import ScreenManager, Screen
-from kivymd.app import MDApp
-from kivymd.uix.menu import MDDropdownMenu
-from kivymd.uix.button import MDRaisedButton
-from kivymd.uix.label import MDLabel
-import bluetooth
+<HomeScreen>:
+    name: 'home'
+    BoxLayout:
+        orientation: 'vertical'
+        padding: 20
+        spacing: 20
 
-class HomeScreen(Screen):
-    pass
+        MDRaisedButton:
+            text: 'Connect to Device'
+            pos_hint: {'center_x': 0.5}
+            on_release: app.root.current = 'device'
 
-class DeviceScreen(Screen):
-    pass
+        MDRaisedButton:
+            text: 'Turn ON'
+            pos_hint: {'center_x': 0.5}
+            on_release: app.turn_on()
 
-class MainApp(MDApp):
-    def build(self):
-        self.screen = Builder.load_string(KV)
-        self.bt_socket = None
+        MDRaisedButton:
+            text: 'Turn OFF'
+            pos_hint: {'center_x': 0.5}
+            on_release: app.turn_off()
 
-        nearby_devices = bluetooth.discover_devices(lookup_names=True)
-        menu_items = [
-            {
-                "viewclass": "OneLineListItem",
-                "text": f"{name} ({addr})",
-                "on_release": lambda x=addr: self.connect_device(x),
-            } for addr, name in nearby_devices
-        ]
+<DeviceScreen>:
+    name: 'device'
+    BoxLayout:
+        orientation: 'vertical'
+        padding: 20
+        spacing: 20
 
-        self.menu = MDDropdownMenu(
-            caller=self.screen.get_screen('device').children[1],
-            items=menu_items,
-            width_mult=4,
-        )
+        MDRaisedButton:
+            text: 'Back to Home'
+            pos_hint: {'center_x': 0.5}
+            on_release: app.root.current = 'home'
 
-        return self.screen
+        MDRaisedButton:
+            text: 'Connect to Device'
+            pos_hint: {'center_x': 0.5}
+            on_release: app.menu.open()
 
-    def connect_device(self, address):
-        try:
-            self.bt_socket = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
-            self.bt_socket.connect((address, 1))
-            self.screen.get_screen('device').ids.status_label.text = f'Connected to {address}'
-        except Exception as e:
-            self.screen.get_screen('device').ids.status_label.text = f'Failed to connect: {str(e)}'
-        self.menu.dismiss()
-
-    def turn_on(self):
-        if self.bt_socket:
-            self.bt_socket.send('1')
-
-    def turn_off(self):
-        if self.bt_socket:
-            self.bt_socket.send('0')
-
-if __name__ == '__main__':
-    MainApp().run()
-
+        MDLabel:
+            id: status_label
+            text: 'Not Connected'
+            halign: 'center'
+'''
 
 class HomeScreen(Screen):
     pass
@@ -74,15 +66,15 @@ class DeviceScreen(Screen):
 class MainApp(MDApp):
     def build(self):
         self.screen = Builder.load_string(KV)
-        self.bt_socket = None
+        self.arduino = None
 
-        nearby_devices = bluetooth.discover_devices(lookup_names=True)
+        ports = serial.tools.list_ports.comports()
         menu_items = [
             {
                 "viewclass": "OneLineListItem",
-                "text": f"{name} ({addr})",
-                "on_release": lambda x=addr: self.connect_device(x),
-            } for addr, name in nearby_devices
+                "text": port.device,
+                "on_release": lambda x=port.device: self.connect_device(x),
+            } for port in ports
         ]
 
         self.menu = MDDropdownMenu(
@@ -93,22 +85,21 @@ class MainApp(MDApp):
 
         return self.screen
 
-    def connect_device(self, address):
+    def connect_device(self, device):
         try:
-            self.bt_socket = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
-            self.bt_socket.connect((address, 1))
-            self.screen.get_screen('device').ids.status_label.text = f'Connected to {address}'
+            self.arduino = serial.Serial(device, 9600, timeout=1)
+            self.screen.get_screen('device').ids.status_label.text = f'Connected to {device}'
         except Exception as e:
             self.screen.get_screen('device').ids.status_label.text = f'Failed to connect: {str(e)}'
         self.menu.dismiss()
 
     def turn_on(self):
-        if self.bt_socket:
-            self.bt_socket.send('1')
+        if self.arduino:
+            self.arduino.write(b'1')
 
     def turn_off(self):
-        if self.bt_socket:
-            self.bt_socket.send('0')
+        if self.arduino:
+            self.arduino.write(b'0')
 
 if __name__ == '__main__':
     MainApp().run()
