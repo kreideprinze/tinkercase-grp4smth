@@ -1,0 +1,49 @@
+int ledPin = 13;
+int newState;
+int oldState = 0;
+int led = 0;
+
+int buttonNew;
+int buttonOld = 0;
+
+void setup() {
+  pinMode(ledPin, OUTPUT);
+  digitalWrite(ledPin, LOW);
+  digitalWrite(7,INPUT);
+  Serial.begin(9600); // Default communication rate of the Bluetooth module
+}
+
+void loop() {
+  if(Serial.available() > 0){ // Checks whether data is comming from the serial port
+    newState = Serial.read(); // Reads the data from the serial port
+ }
+
+  if (newState!=oldState){
+    if (led==0){
+      digitalWrite(ledPin,HIGH);
+      led = 1;
+      Serial.println("1");
+    }
+    else{
+      digitalWrite(ledPin,LOW);
+      led = 0;
+      Serial.println("0");
+    }
+  }
+ oldState = newState;
+ buttonNew = digitalRead(7);
+ if (buttonOld!=buttonNew){
+  if (led==0){
+    digitalWrite(ledPin,HIGH);
+    led = 1;
+    Serial.println("1");
+  }
+  else{
+    digitalWrite(ledPin,LOW);
+    led = 0;
+    Serial.println("0");
+  }
+ }
+ buttonOld = buttonNew;
+
+}
